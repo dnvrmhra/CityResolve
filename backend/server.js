@@ -8,9 +8,12 @@ const app = express();
 
 app.use(cors({
   origin: [
-    'hhttps://city-resolve.vercel.app/',
-    'http://localhost:3000'
-  ]
+    'https://city-resolve.vercel.app/',
+    'https://cityresolve.vercel.app',
+    'http://localhost:3000',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 
