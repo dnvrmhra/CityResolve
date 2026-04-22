@@ -33,7 +33,10 @@ CityResolve is a full-stack web application that allows citizens to report local
 
 ---
 
+
 ## Project Structure
+
+```
 
 CITYRESOLVE/
 │
@@ -52,6 +55,7 @@ CITYRESOLVE/
 │ ├── server.js
 │ └── package.json
 
+```
 ---
 
 ## Setup Instructions
