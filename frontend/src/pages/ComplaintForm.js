@@ -1,3 +1,4 @@
+import { submitComplaint } from '../services/api';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -31,7 +32,7 @@ function CityscapeBg() {
           <stop offset="100%" stopColor="#c7d9f7" stopOpacity="0.55" />
         </linearGradient>
       </defs>
-      
+
       <rect width="1200" height="320" fill="url(#sky)" />
       <g fill="#94a3b8" opacity="0.3">
         <rect x="30" y="200" width="25" height="120" /><rect x="160" y="210" width="30" height="110" />
@@ -97,22 +98,18 @@ export default function ComplaintForm() {
   };
 
   const handleSubmit = async () => {
-    const e2 = validate();
-    if (Object.keys(e2).length) { setErrors(e2); return; }
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    const complaint = {
-      ...form,
-      id: `CR-${Date.now().toString().slice(-6)}`,
-      status: 'Pending',
-      date: new Date().toISOString(),
-      reporter: form.name || 'Anonymous',
-    };
-    const existing = JSON.parse(localStorage.getItem('complaints') || '[]');
-    localStorage.setItem('complaints', JSON.stringify([complaint, ...existing]));
-    setLoading(false);
+  const e2 = validate();
+  if (Object.keys(e2).length) { setErrors(e2); return; }
+  setLoading(true);
+  try {
+    await submitComplaint(form);
     setSubmitted(true);
-  };
+  } catch (err) {
+    alert('Failed to submit complaint. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (submitted) {
     return (

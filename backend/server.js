@@ -6,7 +6,12 @@ const mongoose = require("mongoose");
 dotenv.config();
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'hhttps://city-resolve.vercel.app/',
+    'http://localhost:3000'
+  ]
+}));
 app.use(express.json());
 
 // DB
@@ -77,6 +82,11 @@ app.put("/api/complaints/:id", async (req, res) => {
     { new: true }
   );
   res.json(data);
+});
+
+app.delete("/api/complaints/:id", async (req, res) => {
+  await Complaint.findByIdAndDelete(req.params.id);
+  res.json({ message: "Deleted" });
 });
 
 const PORT = process.env.PORT || 5000;

@@ -1,3 +1,4 @@
+import { fetchComplaints, updateComplaintStatus, deleteComplaint } from '../services/api';
 import { useState, useEffect } from 'react';
 
 const ADMIN_PASSWORD = '1234';
@@ -164,11 +165,12 @@ export default function Admin() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    if (authed) {
-      const saved = JSON.parse(localStorage.getItem('complaints') || '[]');
-      setComplaints([...saved, ...SAMPLE]);
-    }
-  }, [authed]);
+  if (authed) {
+    fetchComplaints()
+      .then(data => setComplaints(data))
+      .catch(() => setComplaints(SAMPLE));
+  }
+}, [authed]);
 
   const handleLogin = () => {
     if (password === ADMIN_PASSWORD) {
@@ -180,24 +182,24 @@ export default function Admin() {
     }
   };
 
-  const handleStatusChange = (id, newStatus) => {
-    setComplaints(prev => {
-      const updated = prev.map(c => c.id === id ? { ...c, status: newStatus } : c);
-      const userOnly = updated.filter(c => !SAMPLE.find(s => s.id === c.id));
-      localStorage.setItem('complaints', JSON.stringify(userOnly));
-      return updated;
-    });
-  };
+  const handleStatusChange = async (id, newStatus) => {
+  try {
+    await updateComplaintStatus(id, newStatus);
+    setComplaints(prev =>
+      prev.map(c => c.id === id ? { ...c, status: newStatus } : c)
+    );
+  } catch (err) {
+    alert('Failed to update status. Check your backend.');
+  }
+};
 
-  const handleDelete = (id) => {
-  setComplaints(prev => {
-    const updated = prev.filter(c => c.id !== id);
-
-    const userOnly = updated.filter(c => !SAMPLE.find(s => s.id === c.id));
-    localStorage.setItem('complaints', JSON.stringify(userOnly));
-
-    return updated;
-  });
+  const handleDelete = async (id) => {
+  try {
+    await deleteComplaint(id);
+    setComplaints(prev => prev.filter(c => c.id !== id));
+  } catch (err) {
+    alert('Failed to delete. Check your backend.');
+  }
 };
 
   const filters = ['All', 'Pending', 'In Progress', 'Resolved', 'Rejected'];

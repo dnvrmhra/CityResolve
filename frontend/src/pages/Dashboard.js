@@ -1,3 +1,4 @@
+import { fetchComplaints } from '../services/api';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -16,8 +17,6 @@ const CATEGORY_ICONS = {
 const SAMPLE = [
   { id: 'CR-001', title: 'Pothole on MG Road', category: 'Roads', location: 'Sector 17, Chandigarh', status: 'In Progress', date: '2026-04-18T09:00:00Z', reporter: 'Amit Sharma', description: 'Large pothole near the bus stop causing accidents and vehicle damage. Has been present for over 2 weeks.' },
   { id: 'CR-002', title: 'Garbage not collected for 3 days', category: 'Garbage', location: 'Phase 7, Mohali', status: 'Pending', date: '2026-04-19T11:00:00Z', reporter: 'Priya Nair', description: 'Overflowing garbage bins outside D-block market. Residents have complained multiple times.' },
-  { id: 'CR-003', title: 'Streetlight out on corner junction', category: 'Electricity', location: 'Sector 8, Kharar', status: 'Resolved', date: '2026-04-15T08:00:00Z', reporter: 'Rahul Gupta', description: 'Street light at the junction has been non-functional for a week. Safety concern at night.' },
-  { id: 'CR-004', title: 'Water pipe leaking near park', category: 'Water', location: 'Sector 22, Chandigarh', status: 'Pending', date: '2026-04-20T07:00:00Z', reporter: 'Sunita Mehta', description: "Underground pipe leaking near the children's park. Road surface is getting damaged." },
 ];
 
 function StatusPill({ status }) {
@@ -36,9 +35,10 @@ export default function Dashboard() {
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('complaints') || '[]');
-    setComplaints([...saved, ...SAMPLE]);
-  }, []);
+  fetchComplaints()
+    .then(data => setComplaints(data))
+    .catch(() => setComplaints(SAMPLE)); // fallback to sample if API fails
+}, []);
 
   const filters = ['All', 'Pending', 'In Progress', 'Resolved', 'Rejected'];
   const filtered = filter === 'All' ? complaints : complaints.filter(c => c.status === filter);
