@@ -2,13 +2,15 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 dotenv.config();
 const app = express();
 
 app.use(cors({
   origin: [
-    'https://city-resolve.vercel.app/',
+    'https://city-resolve.vercel.app',
     'https://cityresolve.vercel.app',
     'http://localhost:3000',
   ],
@@ -17,84 +19,112 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// DB
 mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log("MongoDB Connected"));
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.log("MongoDB Error:", err));
 
-// Models
-const User = mongoose.model("User", {
+const User = mongoose.model("User", new mongoose.Schema({
   name: String,
   email: String,
-  password: String
-});
+  password: String,
+}));
 
-const Complaint = mongoose.model("Complaint", {
+const ComplaintSchema = new mongoose.Schema({
   title: String,
   description: String,
   category: String,
-  status: { type: String, default: "Pending" }
+  location: String,
+  name: String,
+  phone: String,
+  status: { type: String, default: "Pending" },
+  priority: { type: String, default: "Low" },
+  createdAt: { type: Date, default: Date.now },
 });
+const Complaint = mongoose.model("Complaint", ComplaintSchema);
 
-// JWT
-const jwt = require("jsonwebtoken");
-
-// AUTH
-app.post("/api/register", async (req, res) => {
-  const bcrypt = require("bcryptjs");
-  const hash = await bcrypt.hash(req.body.password, 10);
-  const user = await User.create({ ...req.body, password: hash });
-  res.json(user);
-});
-
-app.post("/api/login", async (req, res) => {
-  const bcrypt = require("bcryptjs");
-  const user = await User.findOne({ email: req.body.email });
-  const match = await bcrypt.compare(req.body.password, user.password);
-
-  if (!match) return res.status(401).send("Invalid");
-
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
-  res.json({ token });
-});
-
-// MIDDLEWARE
 const protect = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.sendStatus(401);
-
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  req.user = decoded;
-  next();
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch {
+    res.sendStatus(401);
+  }
 };
 
-// COMPLAINTS
-app.post("/api/complaints", protect, async (req, res) => {
-  const data = await Complaint.create(req.body);
-  res.json(data);
+// Priority scoring
+const calcPriority = (title = '', description = '') => {
+  const text = (title + ' ' + description).toLowerCase();
+  const highWords = ['urgent', 'dangerous', 'accident', 'flood', 'fire', 'broken', 'emergency', 'hazard', 'toxic', 'sewage', 'overflow'];
+  const medWords = ['leak', 'pothole', 'light', 'garbage', 'water', 'road', 'traffic', 'damage'];
+  if (highWords.some(w => text.includes(w))) return 'High';
+  if (medWords.some(w => text.includes(w))) return 'Medium';
+  return 'Low';
+};
+
+app.get("/", (req, res) => res.send("CityResolve Backend Running 🚀"));
+
+app.post("/api/register", async (req, res) => {
+  try {
+    const hash = await bcrypt.hash(req.body.password, 10);
+    const user = await User.create({ ...req.body, password: hash });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post("/api/login", async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) return res.status(401).json({ message: "User not found" });
+    const match = await bcrypt.compare(req.body.password, user.password);
+    if (!match) return res.status(401).json({ message: "Invalid credentials" });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 app.get("/api/complaints", async (req, res) => {
-  const data = await Complaint.find();
-  res.json(data);
+  try {
+    const data = await Complaint.find().sort({ createdAt: -1 });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post("/api/complaints", async (req, res) => {
+  try {
+    const priority = calcPriority(req.body.title, req.body.description);
+    const data = await Complaint.create({ ...req.body, priority });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 app.put("/api/complaints/:id", async (req, res) => {
-  const data = await Complaint.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true }
-  );
-  res.json(data);
+  try {
+    const data = await Complaint.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 app.delete("/api/complaints/:id", async (req, res) => {
-  await Complaint.findByIdAndDelete(req.params.id);
-  res.json({ message: "Deleted" });
+  try {
+    await Complaint.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-
-app.get("/", (req, res) => {
-  res.send("CityResolve Backend Running 🚀");
-});
