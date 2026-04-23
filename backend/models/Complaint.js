@@ -1,6 +1,10 @@
 const mongoose = require("mongoose");
 
 const complaintSchema = new mongoose.Schema({
+  name: String,
+  phone: String,
+  location: String,
+  priority: { type: String, default: 'Low' },
   title: String,
   description: String,
   category: String,
