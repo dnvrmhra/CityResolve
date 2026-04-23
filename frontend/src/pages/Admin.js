@@ -1,6 +1,56 @@
 import { fetchComplaints, updateComplaintStatus, deleteComplaint } from '../services/api';
 import { useState, useEffect } from 'react';
 
+// ─── Shared image gallery used inside expanded complaint cards ────────────────
+function ImageGallery({ images }) {
+  const [lightbox, setLightbox] = useState(null);
+  if (!images || images.length === 0) return null;
+
+  return (
+    <>
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">
+          Attached Photos <span className="text-slate-300 font-normal normal-case">({images.length})</span>
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {images.map((url, i) => (
+            <div key={i} className="relative group cursor-pointer" onClick={() => setLightbox(i)}>
+              <img
+                src={url}
+                alt={`Evidence ${i + 1}`}
+                className="w-24 h-24 object-cover rounded-xl border border-slate-200 hover:opacity-90 transition-opacity shadow-sm"
+              />
+              <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                </svg>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {lightbox !== null && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
+          <div className="relative max-w-3xl w-full" onClick={e => e.stopPropagation()}>
+            <img src={images[lightbox]} alt={`Evidence ${lightbox + 1}`} className="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl" />
+            <button onClick={() => setLightbox(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center text-lg hover:bg-black/80 transition-colors">×</button>
+            {images.length > 1 && (
+              <>
+                <button onClick={e => { e.stopPropagation(); setLightbox(i => (i - 1 + images.length) % images.length); }} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 text-xl">‹</button>
+                <button onClick={e => { e.stopPropagation(); setLightbox(i => (i + 1) % images.length); }} className="absolute right-12 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 text-xl">›</button>
+                <div className="flex justify-center gap-2 mt-3">
+                  {images.map((_, i) => <button key={i} onClick={() => setLightbox(i)} className={`w-2 h-2 rounded-full transition-all ${i === lightbox ? 'bg-white scale-125' : 'bg-white/40'}`} />)}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const ADMIN_PASSWORD = '1234';
 
 const STATUS_STYLES = {
@@ -113,6 +163,8 @@ function ComplaintCard({ complaint, onStatusChange, onDelete }) {
             <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Description</p>
             <p className="text-slate-700 text-sm leading-relaxed">{complaint.description}</p>
           </div>
+
+          <ImageGallery images={complaint.images} />
 
           <div className="flex flex-wrap items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
             <div className="flex items-center gap-2">

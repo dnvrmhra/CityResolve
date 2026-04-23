@@ -1,5 +1,5 @@
 import { submitComplaint } from '../services/api';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const categories = ['Garbage', 'Water', 'Roads', 'Electricity', 'Parks', 'Traffic', 'Infrastructure', 'Other'];
@@ -56,17 +56,24 @@ const calcPriority = (title = '', description = '') => {
   return 'Low';
 };
 
+const MAX_IMAGES = 3;
+const MAX_SIZE_MB = 5;
+
 export default function ComplaintForm() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
   const [form, setForm] = useState({
     title: '', description: '', category: params.get('category') || '',
     location: '', name: '', phone: '',
   });
+  const [images, setImages] = useState([]); // [{ file, preview, name }]
   const [submitted, setSubmitted] = useState(false);
   const [submittedData, setSubmittedData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [lightbox, setLightbox] = useState(null); // preview index
 
   const priority = calcPriority(form.title, form.description);
 
@@ -79,14 +86,42 @@ export default function ComplaintForm() {
     return e;
   };
 
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    const remaining = MAX_IMAGES - images.length;
+    const toAdd = files.slice(0, remaining);
+    const oversized = toAdd.filter(f => f.size > MAX_SIZE_MB * 1024 * 1024);
+
+    if (oversized.length) {
+      alert(`Some files exceed ${MAX_SIZE_MB}MB and were skipped.`);
+    }
+
+    const valid = toAdd.filter(f => f.size <= MAX_SIZE_MB * 1024 * 1024);
+    const newImages = valid.map(file => ({
+      file,
+      name: file.name,
+      preview: URL.createObjectURL(file),
+    }));
+    setImages(prev => [...prev, ...newImages]);
+    e.target.value = '';
+  };
+
+  const removeImage = (idx) => {
+    setImages(prev => {
+      URL.revokeObjectURL(prev[idx].preview);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
   const handleSubmit = async () => {
     const e2 = validate();
     if (Object.keys(e2).length) { setErrors(e2); return; }
     setLoading(true);
     try {
-      const result = await submitComplaint(form);
+      const result = await submitComplaint(form, images.map(i => i.file));
       setSubmittedData(result);
       setSubmitted(true);
+      images.forEach(i => URL.revokeObjectURL(i.preview));
     } catch (err) {
       alert('Failed to submit complaint. Please check your connection and try again.');
     } finally {
@@ -105,24 +140,19 @@ export default function ComplaintForm() {
           </div>
           <h2 className="text-3xl font-black text-slate-900 mb-2">Submitted!</h2>
           <p className="text-slate-500 mb-4">Your complaint has been registered.</p>
-
-          {/* Complaint ID */}
           <div className="inline-block px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-mono font-bold text-lg mb-4">
             {submittedData?._id?.slice(-6).toUpperCase() || 'XXXXXX'}
           </div>
-
-          {/* Priority badge */}
           <div className="flex justify-center mb-6">
             <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold ${PRIORITY_COLORS[p]}`}>
               <span className="text-base">{p === 'High' ? '🔴' : p === 'Medium' ? '🟡' : '🟢'}</span>
               Priority: {p}
             </span>
           </div>
-
           <p className="text-slate-400 mb-8 text-sm">We'll review your report and keep you updated on the resolution progress.</p>
           <div className="flex gap-3 justify-center">
             <button
-              onClick={() => { setSubmitted(false); setForm({ title: '', description: '', category: '', location: '', name: '', phone: '' }); }}
+              onClick={() => { setSubmitted(false); setForm({ title: '', description: '', category: '', location: '', name: '', phone: '' }); setImages([]); }}
               className="px-6 py-3 border border-slate-200 hover:border-blue-300 text-slate-700 rounded-xl transition-all font-semibold hover:bg-blue-50"
             >
               New Complaint
@@ -206,6 +236,76 @@ export default function ComplaintForm() {
             {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
           </div>
 
+          {/* ── Image Upload ── */}
+          <div>
+            <label className="block text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">
+              Photos <span className="text-slate-300 font-normal normal-case tracking-normal">— optional, up to {MAX_IMAGES}</span>
+            </label>
+
+            {/* Thumbnails */}
+            {images.length > 0 && (
+              <div className="flex gap-3 flex-wrap mb-3">
+                {images.map((img, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={img.preview}
+                      alt={img.name}
+                      onClick={() => setLightbox(idx)}
+                      className="w-24 h-24 object-cover rounded-xl border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
+                    />
+                    {/* Remove button */}
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                    >
+                      ×
+                    </button>
+                    {/* Filename tooltip */}
+                    <p className="text-slate-400 text-xs mt-1 truncate w-24 text-center">{img.name}</p>
+                  </div>
+                ))}
+
+                {/* Add more slot */}
+                {images.length < MAX_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 hover:bg-blue-50 flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 transition-all gap-1"
+                  >
+                    <span className="text-2xl leading-none">+</span>
+                    <span className="text-xs">Add</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Drop zone (shown when no images yet) */}
+            {images.length === 0 && (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all gap-2 group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 group-hover:border-blue-200 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-slate-500 text-sm font-medium group-hover:text-blue-600 transition-colors">Click to upload photos</p>
+                <p className="text-slate-400 text-xs">JPG, PNG, WEBP · up to {MAX_SIZE_MB}MB each · max {MAX_IMAGES} photos</p>
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              onChange={handleImageChange}
+              className="hidden"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             {[
               { key: 'name', label: 'Your Name', placeholder: 'Optional', type: 'text' },
@@ -232,10 +332,43 @@ export default function ComplaintForm() {
                 </svg>
                 Submitting...
               </span>
-            ) : 'Submit Complaint ↗'}
+            ) : `Submit Complaint ↗${images.length ? ` (${images.length} photo${images.length > 1 ? 's' : ''})` : ''}`}
           </button>
         </div>
       </div>
+
+      {/* Lightbox */}
+      {lightbox !== null && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <div className="relative max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+            <img
+              src={images[lightbox].preview}
+              alt={images[lightbox].name}
+              className="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
+            />
+            <button
+              onClick={() => setLightbox(null)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center text-lg hover:bg-black/80 transition-colors"
+            >
+              ×
+            </button>
+            {images.length > 1 && (
+              <div className="flex justify-center gap-2 mt-3">
+                {images.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setLightbox(i)}
+                    className={`w-2 h-2 rounded-full transition-all ${i === lightbox ? 'bg-white scale-125' : 'bg-white/40'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,50 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+// ─── Inline image gallery for the admin table expanded row ────────────────────
+function ImageGalleryInline({ images }) {
+  const [lightbox, setLightbox] = useState(null);
+  if (!images || images.length === 0) return null;
+
+  return (
+    <>
+      <div>
+        <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8 }}>PHOTOS ({images.length})</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {images.map((url, i) => (
+            <div key={i} style={{ position: "relative", cursor: "pointer" }} onClick={() => setLightbox(i)}>
+              <img
+                src={url}
+                alt={`Evidence ${i + 1}`}
+                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 10, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {lightbox !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setLightbox(null)}>
+          <div style={{ position: "relative", maxWidth: 800, width: "100%" }} onClick={e => e.stopPropagation()}>
+            <img src={images[lightbox]} alt={`Evidence ${lightbox + 1}`} style={{ width: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: 16, boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }} />
+            <button onClick={() => setLightbox(null)} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+            {images.length > 1 && (
+              <>
+                <button onClick={e => { e.stopPropagation(); setLightbox(i => (i - 1 + images.length) % images.length); }} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", cursor: "pointer", fontSize: 22 }}>‹</button>
+                <button onClick={e => { e.stopPropagation(); setLightbox(i => (i + 1) % images.length); }} style={{ position: "absolute", right: 52, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", cursor: "pointer", fontSize: 22 }}>›</button>
+                <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+                  {images.map((_, i) => <button key={i} onClick={() => setLightbox(i)} style={{ width: 8, height: 8, borderRadius: "50%", border: "none", cursor: "pointer", background: i === lightbox ? "#fff" : "rgba(255,255,255,0.4)", transform: i === lightbox ? "scale(1.3)" : "scale(1)", transition: "all 0.2s" }} />)}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const BASE_URL = process.env.REACT_APP_API_URL;
 const ADMIN_PASSWORD = "1234";
 const SESSION_KEY = "cityresolve_admin_auth";
@@ -381,6 +425,7 @@ function DashboardPage({ complaints, loading, onStatusChange, onDelete }) {
                               <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>PHONE</div>
                               <div style={{ fontSize: 13, color: "#374151" }}>{c.phone}</div>
                             </div>
+                            <ImageGalleryInline images={c.images} />
                             <div>
                               <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8 }}>UPDATE STATUS</div>
                               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

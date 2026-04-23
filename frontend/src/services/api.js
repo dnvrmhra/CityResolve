@@ -6,7 +6,29 @@ export const fetchComplaints = async () => {
   return res.json();
 };
 
-export const submitComplaint = async (data) => {
+/**
+ * Submit a complaint with optional image files.
+ * Sends multipart/form-data when images are present so the backend
+ * (multer) can receive and store them as base64 data-URLs in MongoDB.
+ */
+export const submitComplaint = async (data, imageFiles = []) => {
+  if (imageFiles.length > 0) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) formData.append(key, value);
+    });
+    imageFiles.forEach(file => formData.append('images', file));
+
+    const res = await fetch(`${BASE_URL}/api/complaints`, {
+      method: 'POST',
+      // Do NOT set Content-Type — browser sets it with the correct multipart boundary
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Failed to submit');
+    return res.json();
+  }
+
+  // No images — plain JSON
   const res = await fetch(`${BASE_URL}/api/complaints`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
